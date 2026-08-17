@@ -7,9 +7,9 @@
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:companion_app/services/ble_service.dart';
-import 'package:companion_app/screens/home_screen.dart';
-import 'package:companion_app/main.dart';
+import 'package:MedRemind/services/ble_service.dart';
+import 'package:MedRemind/screens/home_screen.dart';
+import 'package:MedRemind/main.dart';
 
 void main() {
   testWidgets('Counter increments smoke test', (WidgetTester tester) async {
@@ -19,7 +19,7 @@ void main() {
         providers: [
           ChangeNotifierProvider(create: (_) => BLEService()),
         ],
-        child: const GozieMedicationApp(),
+        child: const MedRemindApp(),
       ),
     );
 

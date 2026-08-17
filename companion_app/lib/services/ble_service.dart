@@ -53,7 +53,7 @@ class BLEService extends ChangeNotifier {
     }
     
     _state = DeviceConnectionState.scanning;
-    _statusMessage = "Scanning for Gozie-MedReminder...";
+    _statusMessage = "Scanning for MedRemind...";
     _scanResults.clear();
     notifyListeners();
 

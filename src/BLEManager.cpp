@@ -50,7 +50,7 @@ BLEManager::BLEManager()
 
 void BLEManager::init() {
     // 1. Initialize BLE device
-    BLEDevice::init("Gozie-MedReminder");
+    BLEDevice::init("MedRemind");
 
     // 2. Create Server
     pServer = BLEDevice::createServer();

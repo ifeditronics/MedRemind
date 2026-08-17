@@ -90,12 +90,12 @@ BEGIN
         BLOCK "040904e4"
         BEGIN
             VALUE "CompanyName", "com.gozie" "\0"
-            VALUE "FileDescription", "companion_app" "\0"
+            VALUE "FileDescription", "MedRemind" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "companion_app" "\0"
+            VALUE "InternalName", "MedRemind" "\0"
             VALUE "LegalCopyright", "Copyright (C) 2026 com.gozie. All rights reserved." "\0"
-            VALUE "OriginalFilename", "companion_app.exe" "\0"
-            VALUE "ProductName", "companion_app" "\0"
+            VALUE "OriginalFilename", "MedRemind.exe" "\0"
+            VALUE "ProductName", "MedRemind" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

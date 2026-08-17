@@ -140,7 +140,7 @@ class _HomeScreenState extends State<HomeScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              "Gozie MedReminder",
+              "MedRemind",
               style: TextStyle(
                 color: Color(0xFF1E293B),
                 fontSize: 18,
@@ -229,7 +229,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 )
               : const Icon(Icons.bluetooth_searching_rounded, color: Colors.white),
           label: Text(
-            provider.scanning ? "Scanning for Gozie..." : "Scan & Connect Device",
+            provider.scanning ? "Scanning for MedRemind..." : "Scan & Connect Device",
             style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
           ),
           style: ElevatedButton.styleFrom(
@@ -284,18 +284,37 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Row(
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Icon(Icons.link_rounded, color: Colors.white70, size: 16),
-                    SizedBox(width: 6),
-                    Text(
-                      "NEXT MEDICATION",
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.0,
-                      ),
+                    const Row(
+                      children: [
+                        Icon(Icons.link_rounded, color: Colors.white70, size: 16),
+                        SizedBox(width: 6),
+                        Text(
+                          "NEXT MEDICATION",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        const Icon(Icons.access_time, color: Colors.white70, size: 14),
+                        const SizedBox(width: 4),
+                        Text(
+                          "${(provider.currentPhoneTime.hour % 12 == 0 ? 12 : provider.currentPhoneTime.hour % 12).toString().padLeft(2, '0')}:${provider.currentPhoneTime.minute.toString().padLeft(2, '0')} ${provider.currentPhoneTime.hour >= 12 ? 'PM' : 'AM'}",
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -945,7 +964,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ListTile(
                   leading: const Icon(Icons.search, color: Color(0xFF0EA272)),
                   title: const Text("Scan for Device"),
-                  subtitle: const Text("Search for Gozie-MedReminder"),
+                  subtitle: const Text("Search for MedRemind"),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () {},
                 ),
@@ -1015,7 +1034,7 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 16),
           const Center(
             child: Text(
-              "Medication Reminder",
+              "MedRemind",
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,

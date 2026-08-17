@@ -1,4 +1,4 @@
-package com.gozie.companion_app
+package com.gozie.MedRemind
 
 import io.flutter.embedding.android.FlutterActivity
 

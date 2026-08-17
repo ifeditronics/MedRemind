@@ -1,4 +1,4 @@
-# companion_app
+# MedRemind
 
 A new Flutter project.
 

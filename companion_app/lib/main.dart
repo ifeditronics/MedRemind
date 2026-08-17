@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'services/ble_service.dart';
 import 'providers/device_provider.dart';
-import 'screens/home_screen.dart';
+import 'screens/splash_screen.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,18 +20,18 @@ void main() {
           update: (_, ble, previous) => previous ?? DeviceProvider(ble),
         ),
       ],
-      child: const GozieMedicationApp(),
+      child: const MedRemindApp(),
     ),
   );
 }
 
-class GozieMedicationApp extends StatelessWidget {
-  const GozieMedicationApp({super.key});
+class MedRemindApp extends StatelessWidget {
+  const MedRemindApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Gozie Medication Reminder',
+      title: 'MedRemind',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
@@ -64,7 +64,7 @@ class GozieMedicationApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const HomeScreen(),
+      home: const SplashScreen(),
     );
   }
 }

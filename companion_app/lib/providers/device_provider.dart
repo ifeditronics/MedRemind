@@ -60,7 +60,7 @@ class DeviceProvider extends ChangeNotifier {
   bool get connected => bleService.state == DeviceConnectionState.connected;
   bool get synchronized => bleService.timeSyncAcked;
   String get deviceName => bleService.connectedDevice?.platformName.isEmpty ?? true
-      ? "Gozie-MedReminder"
+      ? "MedRemind"
       : bleService.connectedDevice!.platformName;
 
   String get connectionStatusText {
