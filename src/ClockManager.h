@@ -12,6 +12,7 @@ private:
     uint8_t currentMonth;
     uint16_t currentYear;
     uint8_t currentWeekday; // 0 = Sunday, 1 = Monday, ...
+    uint32_t currentEpoch;
 
     unsigned long lastSecondMillis;
     bool secondChangedFlag;
@@ -27,7 +28,7 @@ public:
     void update(); // Should be called in loop() continuously
 
     // Setters
-    void setDateTime(uint8_t day, uint8_t month, uint16_t year,
+    void setDateTime(uint32_t epoch, uint8_t day, uint8_t month, uint16_t year,
                      uint8_t hour, uint8_t minute, uint8_t second,
                      uint8_t weekday);
 
@@ -39,6 +40,7 @@ public:
     uint8_t getMonth() const { return currentMonth; }
     uint16_t getYear() const { return currentYear; }
     uint8_t getWeekday() const { return currentWeekday; }
+    uint32_t getEpoch() const { return currentEpoch; }
 
     bool checkSecondChanged(); // Returns true once when second changes, resets flag
     bool checkMinuteChanged(); // Returns true once when minute changes, resets flag

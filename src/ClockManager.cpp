@@ -3,6 +3,7 @@
 ClockManager::ClockManager()
     : currentHour(12), currentMinute(0), currentSecond(0),
       currentDay(17), currentMonth(8), currentYear(2026), currentWeekday(1),
+      currentEpoch(1781700000), // Corresponds to Aug 17, 2026
       lastSecondMillis(0), secondChangedFlag(false), minuteChangedFlag(false), dateChangedFlag(false) {}
 
 void ClockManager::init() {
@@ -49,6 +50,7 @@ void ClockManager::update() {
     if (now - lastSecondMillis >= 1000) {
         lastSecondMillis += 1000;
         currentSecond++;
+        currentEpoch++;
         secondChangedFlag = true;
 
         if (currentSecond >= 60) {
@@ -69,9 +71,10 @@ void ClockManager::update() {
     }
 }
 
-void ClockManager::setDateTime(uint8_t day, uint8_t month, uint16_t year,
+void ClockManager::setDateTime(uint32_t epoch, uint8_t day, uint8_t month, uint16_t year,
                                uint8_t hour, uint8_t minute, uint8_t second,
                                uint8_t weekday) {
+    currentEpoch = epoch;
     currentDay = day;
     currentMonth = month;
     currentYear = year;

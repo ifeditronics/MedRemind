@@ -37,6 +37,42 @@ class BLEService extends ChangeNotifier {
   List<ScanResult> get scanResults => _scanResults;
   bool get timeSyncAcked => _timeSyncAcked;
 
+  // Received Schedule Config from Device (0x02)
+  int? receivedScheduleHour;
+  int? receivedScheduleMinute;
+  int? receivedScheduleDose;
+  bool? receivedScheduleActive;
+
+  void clearReceivedSchedule() {
+    receivedScheduleHour = null;
+    receivedScheduleMinute = null;
+    receivedScheduleDose = null;
+    receivedScheduleActive = null;
+  }
+
+  // Received Medication Event from Device (0x04 0x03)
+  int? receivedEventId;
+  int? receivedEventScheduleId;
+  int? receivedEventScheduledYear;
+  int? receivedEventScheduledMonth;
+  int? receivedEventScheduledDay;
+  int? receivedEventScheduledHour;
+  int? receivedEventScheduledMinute;
+  int? receivedEventDose;
+  int? receivedEventSource;
+
+  void clearReceivedEvent() {
+    receivedEventId = null;
+    receivedEventScheduleId = null;
+    receivedEventScheduledYear = null;
+    receivedEventScheduledMonth = null;
+    receivedEventScheduledDay = null;
+    receivedEventScheduledHour = null;
+    receivedEventScheduledMinute = null;
+    receivedEventDose = null;
+    receivedEventSource = null;
+  }
+
   BLEService() {
     _initBLE();
   }
@@ -72,7 +108,7 @@ class BLEService extends ChangeNotifier {
           final name = result.device.platformName.isEmpty 
               ? result.advertisementData.advName 
               : result.device.platformName;
-          if (name == "Gozie-MedReminder") {
+          if (name == "MedRemind") {
             connectToDevice(result.device);
             break;
           }
@@ -158,7 +194,35 @@ class BLEService extends ChangeNotifier {
       await char.setNotifyValue(true);
       _statusSub?.cancel();
       _statusSub = char.lastValueStream.listen((value) {
-        if (value.length >= 2 && value[0] == 0x04) {
+        if (value.isEmpty) return;
+
+        if (value.length >= 6 && value[0] == 0x02) {
+          // Parse schedule update from device: [0x02, id, hour, minute, dose, active]
+          receivedScheduleHour = value[2];
+          receivedScheduleMinute = value[3];
+          receivedScheduleDose = value[4];
+          receivedScheduleActive = value[5] != 0;
+          if (kDebugMode) {
+            print("BLE received schedule sync: $receivedScheduleHour:$receivedScheduleMinute");
+          }
+          notifyListeners();
+        } else if (value.length >= 14 && value[0] == 0x04 && value[1] == 0x03) {
+          // Parse detailed medication event from device
+          receivedEventId = value[2] | (value[3] << 8) | (value[4] << 16) | (value[5] << 24);
+          receivedEventScheduleId = value[6];
+          receivedEventScheduledYear = 2000 + value[7];
+          receivedEventScheduledMonth = value[8];
+          receivedEventScheduledDay = value[9];
+          receivedEventScheduledHour = value[10];
+          receivedEventScheduledMinute = value[11];
+          receivedEventDose = value[12];
+          receivedEventSource = value[13];
+          _deviceStatus = "Medication Taken Successfully";
+          if (kDebugMode) {
+            print("BLE received medication event ID: $receivedEventId");
+          }
+          notifyListeners();
+        } else if (value.length >= 2 && value[0] == 0x04) {
           final statusCode = value[1];
           switch (statusCode) {
             case 0x00:
@@ -226,11 +290,29 @@ class BLEService extends ChangeNotifier {
         active ? 1 : 0,
       ];
       await _statusConfigChar!.write(packet, withoutResponse: false);
-      _statusMessage = "Medication schedule sent successfully";
+      _statusMessage = "Medication schedule updated";
       notifyListeners();
     } catch (e) {
-      _statusMessage = "Config send failed: $e";
+      _statusMessage = "Config failed: $e";
       notifyListeners();
+    }
+  }
+
+  Future<void> sendEventAck(int eventId) async {
+    if (_statusConfigChar == null) return;
+    try {
+      // 5-byte ack packet: [0x06, eventId_b0, eventId_b1, eventId_b2, eventId_b3]
+      final packet = [
+        0x06,
+        eventId & 0xFF,
+        (eventId >> 8) & 0xFF,
+        (eventId >> 16) & 0xFF,
+        (eventId >> 24) & 0xFF,
+      ];
+      await _statusConfigChar!.write(packet, withoutResponse: false);
+      if (kDebugMode) print("Sent Event Ack for event $eventId");
+    } catch (e) {
+      if (kDebugMode) print("Error sending event ack: $e");
     }
   }
 

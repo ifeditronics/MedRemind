@@ -82,21 +82,6 @@ void loop() {
     clockMgr.update();
     buttonMgr.update();
     bleMgr.update();
-    
-    // Handle BLE Connection State Sync (wait for client to subscribe to notifications)
-    static bool wasReadyToNotify = false;
-    bool isReadyToNotify = bleMgr.isReadyToNotify();
-    if (isReadyToNotify && !wasReadyToNotify) {
-        wasReadyToNotify = true;
-        Serial.println("[DIAGNOSTIC] Client subscribed! Syncing device schedule configuration.");
-        MedicationSchedule* pMed = medMgr.getScheduleByIndex(0);
-        if (pMed) {
-            bleMgr.notifyMedicationConfig(pMed->id, pMed->hour, pMed->minute, pMed->dose, pMed->active);
-        }
-    } else if (!isReadyToNotify) {
-        wasReadyToNotify = false;
-    }
-
     alarmMgr.update();
 
     // 2. Handle Night Light (BTN3 Long Press)
@@ -106,11 +91,10 @@ void loop() {
     }
 
     // 3. Handle BLE Time Synchronization
-    uint32_t syncTimestamp;
     uint8_t syncDay, syncMonth, syncHour, syncMinute, syncSecond, syncWeekday;
     uint16_t syncYear;
-    if (bleMgr.checkTimeSyncPending(syncTimestamp, syncDay, syncMonth, syncYear, syncHour, syncMinute, syncSecond, syncWeekday)) {
-        clockMgr.setDateTime(syncTimestamp, syncDay, syncMonth, syncYear, syncHour, syncMinute, syncSecond, syncWeekday);
+    if (bleMgr.checkTimeSyncPending(syncDay, syncMonth, syncYear, syncHour, syncMinute, syncSecond, syncWeekday)) {
+        clockMgr.setDateTime(syncDay, syncMonth, syncYear, syncHour, syncMinute, syncSecond, syncWeekday);
         Serial.println("Clock synchronized with phone time via BLE.");
         
         // Notify BLE client that time sync succeeded
@@ -260,9 +244,6 @@ void loop() {
                     pMed->active = true;
                     deviceMode = MODE_CLOCK;
                     
-                    // Broadcast schedule configuration changes to BLE
-                    bleMgr.notifyMedicationConfig(pMed->id, pMed->hour, pMed->minute, pMed->dose, pMed->active);
-                    
                     // Force refresh standby screen
                     nextMed = medMgr.getNextMedication(clockMgr.getHour(), clockMgr.getMinute());
                     cachedNextMed = nextMed;
@@ -283,19 +264,7 @@ void loop() {
         case MODE_CONFIRM_MEDICATION:
             if (buttonMgr.checkBtn3ShortPressed()) {
                 deviceMode = MODE_CLOCK;
-                
-                // Add the taken event to the offline/online queue
-                bleMgr.addMedicationEvent(
-                    nextMed.id,
-                    nextMed.hour,
-                    nextMed.minute,
-                    nextMed.dose,
-                    1, // Source: 1 = DEVICE
-                    clockMgr.getYear() - 2000,
-                    clockMgr.getMonth(),
-                    clockMgr.getDay(),
-                    clockMgr.getEpoch()
-                );
+                bleMgr.notifyMedicationEvent(0x03); // 0x03 = Confirmed Taken
                 
                 // Recalculate next upcoming medication and draw clock screen
                 nextMed = medMgr.getNextMedication(clockMgr.getHour(), clockMgr.getMinute());

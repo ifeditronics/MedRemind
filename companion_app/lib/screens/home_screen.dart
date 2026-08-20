@@ -19,11 +19,16 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedTabIndex = 0;
   
+  // History tab filters
+  String _historyTimeFilter = "All"; // 'Today', 'This Week', 'All'
+  String _historyStatusFilter = "All"; // 'All', 'TAKEN', 'MISSED', 'CANCELLED', 'RESCHEDULED', 'PENDING'
+  
   // Local input buffer state (initialized from provider on tab entry)
   bool _hasInitializedScheduleState = false;
   String _typedTime = "0800"; // Represents HHMM
   bool _isPM = true;
   String _typedDose = "4";
+  bool _isFirstDoseEdit = true;
   bool _isActiveStatus = true;
   
   ActiveField _activeField = ActiveField.time;
@@ -61,6 +66,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _typedTime = hr12.toString().padLeft(2, '0') + minute.toString().padLeft(2, '0');
       _isPM = hour >= 12;
       _typedDose = deviceProvider.scheduleDose.toString();
+      _isFirstDoseEdit = true;
       _isActiveStatus = deviceProvider.scheduleActive;
       _activeField = ActiveField.time;
       _hasInitializedScheduleState = true;
@@ -75,9 +81,12 @@ class _HomeScreenState extends State<HomeScreen> {
         activeBody = _buildScheduleTab(deviceProvider);
         break;
       case 2:
-        activeBody = _buildSettingsTab(deviceProvider);
+        activeBody = _buildHistoryTab(deviceProvider);
         break;
       case 3:
+        activeBody = _buildSettingsTab(deviceProvider);
+        break;
+      case 4:
         activeBody = _buildAboutTab();
         break;
       default:
@@ -111,6 +120,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.medication_outlined),
             activeIcon: Icon(Icons.medication),
             label: "Schedule",
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history_toggle_off_rounded),
+            activeIcon: Icon(Icons.history_rounded),
+            label: "History",
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),
@@ -323,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       isScheduleActive 
-                          ? "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}"
+                          ? "${(hour % 12 == 0 ? 12 : hour % 12).toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}"
                           : "--:-- --",
                       style: const TextStyle(
                         color: Colors.white,
@@ -433,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             title: Text(
               isScheduleActive 
-                  ? "${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}"
+                  ? "${(hour % 12 == 0 ? 12 : hour % 12).toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}"
                   : "No active schedule",
               style: const TextStyle(
                 fontWeight: FontWeight.bold,
@@ -812,7 +826,8 @@ class _HomeScreenState extends State<HomeScreen> {
           if (_activeField == ActiveField.time) {
             _typedTime = "1200";
           } else if (_activeField == ActiveField.dose) {
-            _typedDose = "1";
+            _typedDose = "";
+            _isFirstDoseEdit = false;
           }
           break;
 
@@ -820,10 +835,9 @@ class _HomeScreenState extends State<HomeScreen> {
           if (_activeField == ActiveField.time) {
             _typedTime = "0${_typedTime.substring(0, 3)}";
           } else if (_activeField == ActiveField.dose) {
-            if (_typedDose.length > 1) {
+            _isFirstDoseEdit = false;
+            if (_typedDose.isNotEmpty) {
               _typedDose = _typedDose.substring(0, _typedDose.length - 1);
-            } else {
-              _typedDose = "1";
             }
           }
           break;
@@ -832,10 +846,15 @@ class _HomeScreenState extends State<HomeScreen> {
           if (_activeField == ActiveField.time) {
             _typedTime = (_typedTime + key).substring((_typedTime + key).length - 4);
           } else if (_activeField == ActiveField.dose) {
-            if (_typedDose == "0") {
+            if (_isFirstDoseEdit) {
               _typedDose = key;
-            } else if (_typedDose.length < 2) {
-              _typedDose += key;
+              _isFirstDoseEdit = false;
+            } else {
+              if (_typedDose == "0") {
+                _typedDose = key;
+              } else if (_typedDose.length < 2) {
+                _typedDose += key;
+              }
             }
           }
       }
@@ -1109,6 +1128,456 @@ class _HomeScreenState extends State<HomeScreen> {
           style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
         ),
       ],
+    );
+  }
+
+  Widget _buildHistoryTab(DeviceProvider provider) {
+    final now = DateTime.now();
+    final todayMidnight = DateTime(now.year, now.month, now.day);
+    final weekAgo = todayMidnight.subtract(const Duration(days: 7));
+
+    // Filtered history list
+    final filteredHistory = provider.history.where((rec) {
+      // 1. Apply time filter
+      if (_historyTimeFilter == "Today") {
+        final schedDate = DateTime(rec.scheduledTime.year, rec.scheduledTime.month, rec.scheduledTime.day);
+        if (schedDate != todayMidnight) return false;
+      } else if (_historyTimeFilter == "This Week") {
+        if (rec.scheduledTime.isBefore(weekAgo)) return false;
+      }
+
+      // 2. Apply status filter
+      if (_historyStatusFilter != "All") {
+        if (rec.status.toUpperCase() != _historyStatusFilter.toUpperCase()) return false;
+      }
+
+      return true;
+    }).toList();
+
+    // Sort by scheduledTime descending (newest first)
+    filteredHistory.sort((a, b) => b.scheduledTime.compareTo(a.scheduledTime));
+
+    // Calculate Adherence stats
+    final takenCount = provider.history.where((rec) => rec.status == 'TAKEN').length;
+    final missedCount = provider.history.where((rec) => rec.status == 'MISSED').length;
+    final cancelledCount = provider.history.where((rec) => rec.status == 'CANCELLED').length;
+    final rescheduledCount = provider.history.where((rec) => rec.status == 'RESCHEDULED').length;
+    final pendingCount = provider.history.where((rec) => rec.status == 'PENDING').length;
+
+    final totalDue = takenCount + missedCount;
+    final double adherenceRate = totalDue > 0 ? (takenCount / totalDue) * 100 : 0.0;
+
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 16,
+        title: const Text("Medication History"),
+        centerTitle: false,
+        actions: [
+          TextButton.icon(
+            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 18),
+            label: const Text(
+              "Clear History",
+              style: TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+            onPressed: () => _showClearHistoryDialog(context, provider),
+          ),
+          const SizedBox(width: 8),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16.0),
+        children: [
+          // 1. Adherence Card
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: Container(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [Color(0xFF0EA272), Color(0xFF0D9367)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              padding: const EdgeInsets.all(20.0),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Medication Adherence",
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          "${adherenceRate.toStringAsFixed(0)}%",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 42,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
+                          "Formula: Taken / (Taken + Missed)",
+                          style: TextStyle(
+                            color: Colors.white54,
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    height: 80,
+                    width: 1,
+                    color: Colors.white24,
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildSummaryStat(Icons.check_circle_rounded, "Taken", takenCount, Colors.white),
+                      const SizedBox(height: 8),
+                      _buildSummaryStat(Icons.cancel_rounded, "Missed", missedCount, Colors.white),
+                      const SizedBox(height: 8),
+                      _buildSummaryStat(Icons.schedule_rounded, "Pending", pendingCount, Colors.white),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          
+          // Additional stats row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 4.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text("Rescheduled: $rescheduledCount", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                Text("Cancelled: $cancelledCount", style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 2. Filters section
+          const Text(
+            "Filter Time Range",
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              _buildFilterChip("All", _historyTimeFilter, (val) {
+                setState(() => _historyTimeFilter = val);
+              }),
+              const SizedBox(width: 8),
+              _buildFilterChip("Today", _historyTimeFilter, (val) {
+                setState(() => _historyTimeFilter = val);
+              }),
+              const SizedBox(width: 8),
+              _buildFilterChip("This Week", _historyTimeFilter, (val) {
+                setState(() => _historyTimeFilter = val);
+              }),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          const Text(
+            "Filter Status",
+            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _buildFilterChip("All", _historyStatusFilter, (val) {
+                  setState(() => _historyStatusFilter = val);
+                }),
+                const SizedBox(width: 8),
+                _buildFilterChip("Taken", _historyStatusFilter, (val) {
+                  setState(() => _historyStatusFilter = val);
+                }),
+                const SizedBox(width: 8),
+                _buildFilterChip("Missed", _historyStatusFilter, (val) {
+                  setState(() => _historyStatusFilter = val);
+                }),
+                const SizedBox(width: 8),
+                _buildFilterChip("Pending", _historyStatusFilter, (val) {
+                  setState(() => _historyStatusFilter = val);
+                }),
+                const SizedBox(width: 8),
+                _buildFilterChip("Rescheduled", _historyStatusFilter, (val) {
+                  setState(() => _historyStatusFilter = val);
+                }),
+                const SizedBox(width: 8),
+                _buildFilterChip("Cancelled", _historyStatusFilter, (val) {
+                  setState(() => _historyStatusFilter = val);
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 3. History List
+          if (provider.history.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40.0),
+                child: Column(
+                  children: [
+                    Icon(Icons.history_toggle_off_rounded, size: 48, color: Colors.grey[400]),
+                    const SizedBox(height: 12),
+                    Text(
+                      "No medication history yet.",
+                      style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else if (filteredHistory.isEmpty)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 40.0),
+                child: Column(
+                  children: [
+                    Icon(Icons.history_toggle_off_rounded, size: 48, color: Colors.grey[400]),
+                    const SizedBox(height: 12),
+                    Text(
+                      "No matching history records found.",
+                      style: TextStyle(color: Colors.grey[500], fontSize: 14),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: filteredHistory.length,
+              itemBuilder: (context, idx) {
+                final rec = filteredHistory[idx];
+                return _buildHistoryItem(rec);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryStat(IconData icon, String label, int val, Color color) {
+    return Row(
+      children: [
+        Icon(icon, color: color.withValues(alpha: 0.8), size: 14),
+        const SizedBox(width: 6),
+        Text(
+          "$val $label",
+          style: TextStyle(
+            color: color,
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFilterChip(String label, String currentVal, Function(String) onSelect) {
+    final isSelected = label.toLowerCase() == currentVal.toLowerCase();
+    return ChoiceChip(
+      label: Text(label),
+      selected: isSelected,
+      onSelected: (selected) {
+        if (selected) onSelect(label);
+      },
+      selectedColor: const Color(0xFF0EA272).withValues(alpha: 0.15),
+      labelStyle: TextStyle(
+        color: isSelected ? const Color(0xFF0EA272) : const Color(0xFF64748B),
+        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        fontSize: 13,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(
+          color: isSelected ? const Color(0xFF0EA272).withValues(alpha: 0.5) : const Color(0xFFE2E8F0),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHistoryItem(HistoryRecord rec) {
+    final scheduledTimeStr = _format12Hour(rec.hour, rec.minute);
+    final scheduledDateStr = _formatHistoryDate(rec.scheduledTime);
+    
+    Color statusColor;
+    switch (rec.status) {
+      case 'TAKEN':
+        statusColor = const Color(0xFF0EA272);
+        break;
+      case 'MISSED':
+        statusColor = const Color(0xFFEF4444);
+        break;
+      case 'CANCELLED':
+        statusColor = const Color(0xFF64748B);
+        break;
+      case 'RESCHEDULED':
+        statusColor = const Color(0xFF3B82F6);
+        break;
+      default:
+        statusColor = const Color(0xFF94A3B8);
+    }
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 14.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  scheduledTimeStr,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  scheduledDateStr,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  "Dose: ${rec.dose} Pill(s)  •  Source: ${rec.source}",
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey[500],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: statusColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: statusColor.withValues(alpha: 0.3), width: 1),
+                  ),
+                  child: Text(
+                    rec.status,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ),
+                if (rec.actualTakenTime != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    "Taken at ${_format12Hour(rec.actualTakenTime!.hour, rec.actualTakenTime!.minute)}",
+                    style: TextStyle(
+                      color: Colors.grey[600],
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _format12Hour(int hour, int minute) {
+    final hr = hour % 12 == 0 ? 12 : hour % 12;
+    final min = minute.toString().padLeft(2, '0');
+    final ampm = hour >= 12 ? "PM" : "AM";
+    return "${hr.toString().padLeft(2, '0')}:$min $ampm";
+  }
+
+  String _formatHistoryDate(DateTime dt) {
+    const months = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+    return "${months[dt.month - 1]} ${dt.day}, ${dt.year}";
+  }
+
+  void _showClearHistoryDialog(BuildContext context, DeviceProvider provider) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            "Clear Medication History?",
+            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+          ),
+          content: const Text(
+            "This will permanently delete all medication history stored on this phone. This action cannot be undone.",
+            style: TextStyle(color: Color(0xFF64748B), fontSize: 14),
+          ),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                "Cancel",
+                style: TextStyle(color: Colors.grey[600], fontWeight: FontWeight.w600),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 0,
+              ),
+              onPressed: () {
+                provider.clearHistory();
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Medication history cleared."),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              child: const Text(
+                "Clear History",
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 }
